@@ -1,23 +1,9 @@
 'use strict';
 const { UserSrv } = require('../services/user-srv');
-const { objects } = require('../helpers');
 const { User } = require('../models/user');
 const { crypt } = require('../helpers');
 const { JwtSrv } = require('../services');
 class UserCtrl {
-    static async getMany(req, res) {
-        const { query } = req;
-        const findCriteria = objects.pick(query, ['name', 'age', 'gender']);
-        const options = objects.pick(query, ['limit', 'offset', 'sort']);
-
-        const users = await UserSrv.readMany(findCriteria, options);
-
-        return res.json({
-            data: users,
-            limit: users.length,
-        });
-    }
-
     static async create(req, res) {
         const { body } = req;
 
@@ -47,7 +33,7 @@ class UserCtrl {
             });
         }
 
-        const jwt = JwtSrv.sign(user._id);
+        const jwt = JwtSrv.sign(user._id.toString());
 
         res.json({
             jwt,
@@ -82,7 +68,7 @@ class UserCtrl {
             });
         }
 
-        const jwt = JwtSrv.sign(user._id);
+        const jwt = JwtSrv.sign(user._id.toString());
 
         res.json({
             jwt,
@@ -90,50 +76,96 @@ class UserCtrl {
     }
 
     static async getOne(req, res) {
-        const user = await UserSrv.readOne({ _id: req.params._id });
+        const auth = req.header('Authorization');
+        const _id = JwtSrv.verify(auth);
+
+        if (!_id) {
+            return res.status(403).json({
+                error: 'Forbidden. Key is incorrect.',
+            });
+        }
+
+        let user;
+
+        try {
+            user = await User.findById(_id);
+        } catch (err) {
+            return res.status(500).json({
+                error: 'Internal Server Error.',
+            });
+        }
 
         return res.json({
-            data: user,
+            user,
         });
     }
 
-    static async post(req, res) {
-        const { body } = req;
-        const create = Array.isArray(body) ? UserSrv.createMany : UserSrv.createOne;
+    static async edit(req, res) {
+        const auth = req.header('Authorization');
+        const _id = JwtSrv.verify(auth);
 
-        const data = await create(body);
+        if (!_id) {
+            return res.status(403).json({
+                error: 'Forbidden. Key is incorrect.',
+            });
+        }
 
-        return res.created({
-            data,
+        let user;
+
+        try {
+            user = await User.findById(_id);
+        } catch (err) {
+            return res.status(500).json({
+                error: 'Internal Server Error.',
+            });
+        }
+
+        if (req.body.name) {
+            user.name = req.body.name;
+        }
+
+        if (req.body.password && req.body.password.length >= 8) {
+            user.password = crypt.encrypt(req.body.password);
+        }
+
+        await user.save();
+
+        return res.json({
+            message: 'User edited',
         });
     }
 
-    static async putOne(req, res) {
-        const user = await UserSrv.updateOne(req.params._id, req.body); // change data
+    static async delete(req, res) {
+        const auth = req.header('Authorization');
+        const _id = JwtSrv.verify(auth);
 
-        return user
-            ? res.accepted({ data: user })
-            : res.notFound({ errors: [{ message: 'resource not found' }] });
-    }
+        if (!_id) {
+            return res.status(403).json({
+                error: 'Forbidden. Key is incorrect.',
+            });
+        }
 
-    static async putMany(req, res) {
-        const isModified = await UserSrv.updateMany(req.body);
+        let user;
 
-        return isModified
-            ? res.accepted({ data: { message: 'updated user by id' } })
-            : res.notFound({ errors: [{ message: 'resource not found' }] });
-    }
+        try {
+            user = await User.findById(_id);
+        } catch (err) {
+            return res.status(500).json({
+                error: 'Internal Server Error.',
+            });
+        }
 
-    static async removeOne(req, res) {
-        const isDeleted  = await UserSrv.deleteOne({ _id: req.params._id });
+        const isDeleted  = await UserSrv.deleteOne({ _id: user._id });
 
-        return isDeleted ? res.noContent() : res.notFound({ errors: [{ message: 'resource not found' }] });
-    }
+        if (isDeleted) {
+            return res.status(200).json({
+                message: 'User deleted.',
+            });
+        }
 
-    static async removeMany(req, res) {
-        const isDeleted = await UserSrv.deleteMany(req.body.ids);
-
-        return  isDeleted ? res.noContent() : res.notFound({ errors: [{ message: 'resource not found' }] });
+        return res.status(500).json({
+            error: 'User could not be deleted.',
+        });
     }
 }
 

@@ -18,10 +18,8 @@ class JwtSrv {
         try {
             return jwt.verify(token, jwtSecret);
         } catch (err) {
-            logger.error({ errMessage: err.message });
+            return null;
         }
-
-        return {};
     }
 }
 
