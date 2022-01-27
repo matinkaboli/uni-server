@@ -4,9 +4,6 @@ const crypto = require('crypto');
 const algorithm = 'aes-256-cbc';
 const key = crypto.scryptSync('keyPassword', 'salt', 32);
 const iv = crypto.scryptSync('ivPassword', 'salt', 16);
-// logger.info({ iv, key });
-// logger.info({ bufferedKey: Buffer.from(key) });
-// logger.info({ keyConvertToString: key.toString() });
 
 const encrypt = data => {
     const str = typeof data === 'string' ? data : JSON.stringify(data);
@@ -27,9 +24,6 @@ const decrypt = message => {
     return finalDecryptedBuffer.toString();
 };
 
-// const encoded = encrypt('Some serious stuff');
-// const decoded = decrypt(encoded);
-// logger.info(decoded);
 const crypt = {
     encrypt,
     decrypt,
