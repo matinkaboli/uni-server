@@ -1,6 +1,8 @@
 'use strict';
 const { UserSrv } = require('../services/user-srv');
 const { User } = require('../models/user');
+const { UserCourse } = require('../models/userCourse');
+const { Course } = require('../models/course');
 const { crypt } = require('../helpers');
 const { JwtSrv } = require('../services');
 class UserCtrl {
@@ -97,6 +99,124 @@ class UserCtrl {
 
         return res.json({
             user,
+        });
+    }
+
+    static async addUserCourse(req, res) {
+        const auth = req.header('Authorization');
+        const _id = JwtSrv.verify(auth);
+
+        if (!_id) {
+            return res.status(403).json({
+                error: 'Forbidden. Key is incorrect.',
+            });
+        }
+
+        const { teacher, course } = req.body;
+
+        if (!teacher || !course) {
+            return res.status(400).json({
+                error: 'needs teacher, course',
+            });
+        }
+
+        let userCourse;
+
+        try {
+            userCourse = await UserCourse.create({
+                user: _id,
+                teacher,
+                course,
+            });
+        } catch (err) {
+            console.log(err);
+            return res.status(500).json({
+                error: 'Internal Server Error.',
+            });
+        }
+
+        return res.json({
+            userCourse,
+        });
+    }
+
+    static async getUserCourse(req, res) {
+        const auth = req.header('Authorization');
+        const _id = JwtSrv.verify(auth);
+
+        if (!_id) {
+            return res.status(403).json({
+                error: 'Forbidden. Key is incorrect.',
+            });
+        }
+
+        let userCourse;
+
+        try {
+            userCourse = await UserCourse.find({
+                user: _id,
+            })
+                .populate('teacher')
+                .populate('course')
+                .exec();
+        } catch (err) {
+            return res.status(500).json({
+                error: 'Internal Server Error.',
+            });
+        }
+
+        return res.json({
+            userCourse,
+        });
+    }
+
+    static async getCourses(req, res) {
+        const auth = req.header('Authorization');
+        const _id = JwtSrv.verify(auth);
+
+        if (!_id) {
+            return res.status(403).json({
+                error: 'Forbidden. Key is incorrect.',
+            });
+        }
+
+        let courses;
+
+        try {
+            courses = await Course.find({}).populate('teacher').exec();
+        } catch (err) {
+            return res.status(500).json({
+                error: 'Internal Server Error.',
+            });
+        }
+
+        return res.json({
+            courses,
+        });
+    }
+
+    static async deleteUserCourse(req, res) {
+        const auth = req.header('Authorization');
+        const _id = JwtSrv.verify(auth);
+
+        if (!_id) {
+            return res.status(403).json({
+                error: 'Forbidden. Key is incorrect.',
+            });
+        }
+
+        const { _id: userCourseId } = req.params;
+
+        const isDeleted  = await UserCourse.findOneAndRemove({ _id: userCourseId });
+
+        if (isDeleted) {
+            return res.status(200).json({
+                message: 'UserCourse deleted.',
+            });
+        }
+
+        return res.status(500).json({
+            error: 'User could not be deleted.',
         });
     }
 
